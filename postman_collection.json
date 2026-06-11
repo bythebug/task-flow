@@ -1,0 +1,311 @@
+{
+  "info": {
+    "name": "task-flow API",
+    "description": "## How to use\n1. Set `base_url` variable to your server (default: http://localhost:5000)\n2. Run **Register** to create an account\n3. Run **Login** — the token is saved automatically to `{{token}}`\n4. Run **Create Task** — `{{task_id}}` is saved automatically\n5. All other requests are ready to fire\n\nFor sharing tests, register a second user and update `{{target_email}}` and `{{target_user_id}}`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "base_url",       "value": "http://localhost:5000", "type": "string" },
+    { "key": "token",          "value": "",                      "type": "string" },
+    { "key": "task_id",        "value": "1",                     "type": "string" },
+    { "key": "target_user_id", "value": "2",                     "type": "string" },
+    { "key": "target_email",   "value": "bob@example.com",       "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@example.com\",\n  \"password\": \"Password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Create a new account. Password must be 8+ chars with uppercase, lowercase, and a digit."
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.token) {",
+                  "    pm.collectionVariables.set('token', data.token);",
+                  "    console.log('✓ Token saved. Expires in', data.expires_in, 'seconds.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@example.com\",\n  \"password\": \"Password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Returns a JWT token valid for 24 hours. The token is automatically saved to `{{token}}`."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Revokes the current token. It cannot be used again even before expiry."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "List Tasks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tasks/",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", ""],
+              "query": [
+                { "key": "page",  "value": "1",  "disabled": true },
+                { "key": "limit", "value": "20", "disabled": true },
+                { "key": "status",   "value": "todo",   "disabled": true },
+                { "key": "priority", "value": "high",   "disabled": true }
+              ]
+            },
+            "description": "Returns paginated task list. Unfiltered requests are served from Redis cache (5-min TTL). Enable query params to filter."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.id) {",
+                  "    pm.collectionVariables.set('task_id', data.id);",
+                  "    console.log('✓ task_id saved:', data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Build the API\",\n  \"description\": \"Implement all endpoints with tests\",\n  \"status\": \"in_progress\",\n  \"priority\": \"high\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", ""]
+            },
+            "description": "Creates a task. `task_id` is auto-saved for subsequent requests.\n\nValid status: `todo`, `in_progress`, `done`, `cancelled`\nValid priority: `low`, `medium`, `high`, `urgent`"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Task",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}"]
+            },
+            "description": "Fetch a single task. Works if you own it or have at least `view` permission."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Task",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Build the API (updated)\",\n  \"status\": \"done\",\n  \"priority\": \"urgent\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}"]
+            },
+            "description": "All fields optional. Requires `edit` permission. Updates `updated_at` automatically."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Task",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}"]
+            },
+            "description": "Requires `delete` permission (or ownership)."
+          },
+          "response": []
+        },
+        {
+          "name": "List Tasks — filtered",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tasks/?status=todo&priority=high",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", ""],
+              "query": [
+                { "key": "status",   "value": "todo" },
+                { "key": "priority", "value": "high" }
+              ]
+            },
+            "description": "Filtered requests skip the cache and hit the database directly."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sharing",
+      "item": [
+        {
+          "name": "Share Task",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{target_email}}\",\n  \"permission_level\": \"edit\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/share",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "share"]
+            },
+            "description": "Share with another registered user. Requires ownership or `delete` permission.\n\nLevels: `view` (read-only) | `edit` (read+write) | `delete` (full control)"
+          },
+          "response": []
+        },
+        {
+          "name": "List Collaborators",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/collaborators",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "collaborators"]
+            },
+            "description": "Returns all users who have explicit permissions on this task (does not include the owner)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Permission",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permission_level\": \"view\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/permissions/{{target_user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "permissions", "{{target_user_id}}"]
+            },
+            "description": "Change a collaborator's permission level. Get `target_user_id` from List Collaborators."
+          },
+          "response": []
+        },
+        {
+          "name": "Revoke Access",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/share/{{target_user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "share", "{{target_user_id}}"]
+            },
+            "description": "Remove a user's access entirely."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "No auth required. Returns 200 when the service is up."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

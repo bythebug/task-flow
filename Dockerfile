@@ -15,4 +15,5 @@ EXPOSE 5000
 ENV PYTHONUNBUFFERED=1
 
 # 4 workers handles ~200 concurrent requests; tune to (2 * CPU cores + 1) in production
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "60", "run:app"]
+# Railway injects $PORT dynamically; fall back to 5000 for local Docker usage
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 4 --timeout 60 run:app"]

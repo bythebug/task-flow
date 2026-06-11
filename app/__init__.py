@@ -31,6 +31,10 @@ def create_app(database_url: str | None = None) -> Flask:
     def shutdown_session(exception: BaseException | None = None) -> None:
         Session.remove()
 
+    @app.route("/health")
+    def health():
+        return {"status": "ok"}, 200
+
     app.register_blueprint(create_auth_blueprint(Session), url_prefix="/auth")
     app.register_blueprint(create_tasks_blueprint(Session), url_prefix="/tasks")
 
