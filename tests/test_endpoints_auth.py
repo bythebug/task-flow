@@ -1,7 +1,7 @@
 import pytest
 
 from app import create_app
-from middleware import _token_blocklist
+from app.core.middleware import _token_blocklist
 
 
 @pytest.fixture

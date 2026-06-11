@@ -1,6 +1,7 @@
-from error_handlers import AppError
-from models import PermissionLevel, Task, TaskPermission, User
 from sqlalchemy.orm import joinedload
+
+from app.core.error_handlers import AppError
+from app.models import PermissionLevel, Task, TaskPermission, User
 
 _LEVEL_RANK = {
     PermissionLevel.view: 1,
@@ -22,7 +23,6 @@ class TaskNotFoundError(AppError):
 
 
 def check_permission(session, task_id: int, user_id: int, required_level: PermissionLevel) -> bool:
-    """Return True if user has at least required_level on the task. Owner always passes."""
     task = session.get(Task, task_id)
     if task is None:
         return False
@@ -35,7 +35,6 @@ def check_permission(session, task_id: int, user_id: int, required_level: Permis
 
 
 def _assert_can_manage(session, task: Task, requester_id: int) -> None:
-    """Raise PermissionDeniedError unless requester is the owner or has delete-level access."""
     if task.user_id == requester_id:
         return
     perm = session.query(TaskPermission).filter_by(task_id=task.id, user_id=requester_id).first()
@@ -106,7 +105,6 @@ def get_task_collaborators(session, task_id: int, requester_id: int) -> list[dic
     if not check_permission(session, task_id, requester_id, PermissionLevel.view):
         raise PermissionDeniedError("Access denied")
 
-    # joinedload fetches TaskPermission + User in one query, avoiding N+1
     perms = (
         session.query(TaskPermission)
         .options(joinedload(TaskPermission.user))

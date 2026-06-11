@@ -3,13 +3,11 @@ import logging
 
 from flask import g, jsonify, request
 
-from auth import TokenError, decode_token
-from error_handlers import AppError
+from app.auth.service import TokenError, decode_token
+from app.core.error_handlers import AppError
 
 logger = logging.getLogger(__name__)
 
-# In-memory blocklist for revoked tokens (logout).
-# Production replacement: Redis SET with TTL matching token expiry.
 _token_blocklist: set[str] = set()
 
 
@@ -41,7 +39,7 @@ def handle_errors(f):
         try:
             return f(*args, **kwargs)
         except AppError:
-            raise  # propagate to Flask error handlers
+            raise
         except Exception:
             logger.exception("Unhandled exception in %s", f.__name__)
             return jsonify({"error": "Internal server error"}), 500
@@ -50,13 +48,9 @@ def handle_errors(f):
 
 
 def check_task_access(session, task_id: int, user_id: int, required_level):
-    """Return an error response tuple if access is denied, None if granted.
-
-    Call this at the top of any view that operates on a specific task.
-    required_level should be a PermissionLevel enum value.
-    """
-    from models import Task
-    from permissions import check_permission
+    """Return an error response tuple if access is denied, None if granted."""
+    from app.models import Task
+    from app.tasks.service import check_permission
 
     task = session.get(Task, task_id)
     if task is None:

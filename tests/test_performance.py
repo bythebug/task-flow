@@ -4,9 +4,9 @@ import time
 import fakeredis
 import pytest
 
-import cache as cache_module
 from app import create_app
-from middleware import _token_blocklist
+from app.core.middleware import _token_blocklist
+from app.tasks import cache as cache_module
 
 
 @pytest.fixture

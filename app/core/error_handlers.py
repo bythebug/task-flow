@@ -6,10 +6,6 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 logger = logging.getLogger(__name__)
 
 
-# ------------------------------------------------------------------ #
-# Exception hierarchy
-# ------------------------------------------------------------------ #
-
 class AppError(Exception):
     """Base for all application-level exceptions.
 
@@ -29,22 +25,13 @@ class DatabaseError(AppError):
     pass
 
 
-# ------------------------------------------------------------------ #
-# Response helper
-# ------------------------------------------------------------------ #
-
 def error_json(message: str, **extra) -> dict:
     return {"error": message, **extra}
 
 
-# ------------------------------------------------------------------ #
-# Flask error handler registration
-# ------------------------------------------------------------------ #
-
 def register_error_handlers(app) -> None:
-    # Delayed imports break the auth/permissions → error_handlers cycle.
-    from auth import AuthenticationError, EmailAlreadyExistsError, TokenError
-    from permissions import PermissionDeniedError, TaskNotFoundError, UserNotFoundError
+    from app.auth.service import AuthenticationError, EmailAlreadyExistsError, TokenError
+    from app.tasks.service import PermissionDeniedError, TaskNotFoundError, UserNotFoundError
 
     app.register_error_handler(
         ValidationError,

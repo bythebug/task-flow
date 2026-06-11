@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.exc import OperationalError
 
 from app import create_app
-from middleware import _token_blocklist
+from app.core.middleware import _token_blocklist
 
 
 @pytest.fixture
@@ -122,7 +122,7 @@ def test_database_connection_error(client):
     task_id = _create_task(client, token)
 
     # Task exists; simulate DB failing inside check_permission
-    with patch("permissions.check_permission", side_effect=OperationalError("DB down", None, None)):
+    with patch("app.tasks.service.check_permission", side_effect=OperationalError("DB down", None, None)):
         res = client.get(f"/tasks/{task_id}", headers=_auth(token))
 
     assert res.status_code == 500

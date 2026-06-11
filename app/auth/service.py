@@ -4,9 +4,9 @@ import bcrypt
 import jwt
 from sqlalchemy.orm import Session
 
-from config import JWT_ALGORITHM, JWT_SECRET_KEY, TOKEN_EXPIRY_HOURS
-from error_handlers import AppError
-from models import User
+from app.config import JWT_ALGORITHM, JWT_SECRET_KEY, TOKEN_EXPIRY_HOURS
+from app.core.error_handlers import AppError
+from app.models import User
 
 
 class EmailAlreadyExistsError(AppError):
@@ -21,8 +21,6 @@ class TokenError(AppError):
     pass
 
 
-# --- password helpers ---
-
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
@@ -31,11 +29,9 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode(), password_hash.encode())
 
 
-# --- auth functions ---
-
 def register(session: Session, email: str, password: str) -> User:
     if session.query(User).filter_by(email=email).first():
-        raise EmailAlreadyExistsError(f"Email already registered")
+        raise EmailAlreadyExistsError("Email already registered")
 
     user = User(email=email, password_hash=hash_password(password))
     session.add(user)

@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from auth import (
+from app.auth.service import (
     AuthenticationError,
     EmailAlreadyExistsError,
     TokenError,
@@ -13,8 +13,8 @@ from auth import (
     login,
     register,
 )
-from config import JWT_ALGORITHM, JWT_SECRET_KEY
-from models import Base
+from app.config import JWT_ALGORITHM, JWT_SECRET_KEY
+from app.models import Base
 
 
 @pytest.fixture

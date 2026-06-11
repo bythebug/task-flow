@@ -3,16 +3,15 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, g, jsonify, request
 
-from cache import cache_user_tasks, get_cached_tasks, invalidate_user_cache
-from database import timed_query
-from middleware import check_task_access, handle_errors, require_auth
-from models import PermissionLevel, Task, TaskPriority, TaskStatus
-from validators import validate_task_fields
-from permissions import (
+from app.core.database import timed_query
+from app.core.middleware import check_task_access, handle_errors, require_auth
+from app.core.validators import validate_task_fields
+from app.models import PermissionLevel, Task, TaskPriority, TaskStatus
+from app.tasks.cache import cache_user_tasks, get_cached_tasks, invalidate_user_cache
+from app.tasks.service import (
     PermissionDeniedError,
     TaskNotFoundError,
     UserNotFoundError,
-    check_permission,
     get_task_collaborators,
     revoke_access,
     share_task,
@@ -42,9 +41,6 @@ def _task_to_dict(task: Task) -> dict:
 def create_tasks_blueprint(Session):
     tasks_bp = Blueprint("tasks", __name__)
 
-    # ------------------------------------------------------------------ #
-    # GET /tasks
-    # ------------------------------------------------------------------ #
     @tasks_bp.route("/", methods=["GET"])
     @require_auth
     @handle_errors
@@ -88,7 +84,6 @@ def create_tasks_blueprint(Session):
                 "pages": max(1, (total + limit - 1) // limit),
             }), 200
 
-        # Filtered path — skip cache, let the DB do the work
         with timed_query("list_tasks_filtered"):
             query = Session.query(Task).filter(Task.user_id == g.user_id)
             if status_filter:
@@ -112,9 +107,6 @@ def create_tasks_blueprint(Session):
             "pages": max(1, (total + limit - 1) // limit),
         }), 200
 
-    # ------------------------------------------------------------------ #
-    # POST /tasks
-    # ------------------------------------------------------------------ #
     @tasks_bp.route("/", methods=["POST"])
     @require_auth
     @handle_errors
@@ -137,9 +129,6 @@ def create_tasks_blueprint(Session):
         logger.info("task created id=%s user_id=%s", task.id, g.user_id)
         return jsonify(_task_to_dict(task)), 201
 
-    # ------------------------------------------------------------------ #
-    # GET /tasks/<id>  — requires view permission
-    # ------------------------------------------------------------------ #
     @tasks_bp.route("/<int:task_id>", methods=["GET"])
     @require_auth
     @handle_errors
@@ -148,9 +137,6 @@ def create_tasks_blueprint(Session):
             return err
         return jsonify(_task_to_dict(Session.get(Task, task_id))), 200
 
-    # ------------------------------------------------------------------ #
-    # PUT /tasks/<id>  — requires edit permission
-    # ------------------------------------------------------------------ #
     @tasks_bp.route("/<int:task_id>", methods=["PUT"])
     @require_auth
     @handle_errors
@@ -179,9 +165,6 @@ def create_tasks_blueprint(Session):
         logger.info("task updated id=%s user_id=%s", task.id, g.user_id)
         return jsonify(_task_to_dict(task)), 200
 
-    # ------------------------------------------------------------------ #
-    # DELETE /tasks/<id>  — requires delete permission
-    # ------------------------------------------------------------------ #
     @tasks_bp.route("/<int:task_id>", methods=["DELETE"])
     @require_auth
     @handle_errors
@@ -197,9 +180,6 @@ def create_tasks_blueprint(Session):
         logger.info("task deleted id=%s user_id=%s", task_id, g.user_id)
         return jsonify({"message": "Task deleted"}), 200
 
-    # ------------------------------------------------------------------ #
-    # POST /tasks/<id>/share
-    # ------------------------------------------------------------------ #
     @tasks_bp.route("/<int:task_id>/share", methods=["POST"])
     @require_auth
     @handle_errors
@@ -225,9 +205,6 @@ def create_tasks_blueprint(Session):
         logger.info("task shared task_id=%s with user_id=%s level=%s", task_id, target.id, permission_level)
         return jsonify({"message": f"Task shared with {email}", "user_id": target.id, "permission_level": permission_level}), 200
 
-    # ------------------------------------------------------------------ #
-    # GET /tasks/<id>/collaborators
-    # ------------------------------------------------------------------ #
     @tasks_bp.route("/<int:task_id>/collaborators", methods=["GET"])
     @require_auth
     @handle_errors
@@ -241,9 +218,6 @@ def create_tasks_blueprint(Session):
 
         return jsonify({"collaborators": collaborators}), 200
 
-    # ------------------------------------------------------------------ #
-    # DELETE /tasks/<id>/share/<user_id>
-    # ------------------------------------------------------------------ #
     @tasks_bp.route("/<int:task_id>/share/<int:target_user_id>", methods=["DELETE"])
     @require_auth
     @handle_errors
@@ -258,9 +232,6 @@ def create_tasks_blueprint(Session):
         logger.info("access revoked task_id=%s target_user_id=%s by user_id=%s", task_id, target_user_id, g.user_id)
         return jsonify({"message": "Access revoked"}), 200
 
-    # ------------------------------------------------------------------ #
-    # PUT /tasks/<id>/permissions/<user_id>
-    # ------------------------------------------------------------------ #
     @tasks_bp.route("/<int:task_id>/permissions/<int:target_user_id>", methods=["PUT"])
     @require_auth
     @handle_errors
