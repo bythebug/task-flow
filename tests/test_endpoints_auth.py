@@ -19,11 +19,11 @@ def clear_blocklist():
     _token_blocklist.clear()
 
 
-def _register(client, email="alice@example.com", password="password123"):
+def _register(client, email="alice@example.com", password="Password123"):
     return client.post("/auth/register", json={"email": email, "password": password})
 
 
-def _login(client, email="alice@example.com", password="password123"):
+def _login(client, email="alice@example.com", password="Password123"):
     return client.post("/auth/login", json={"email": email, "password": password})
 
 

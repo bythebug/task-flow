@@ -5,6 +5,7 @@ from flask import Blueprint, g, jsonify, request
 
 from middleware import check_task_access, handle_errors, require_auth
 from models import PermissionLevel, Task, TaskPriority, TaskStatus
+from validators import validate_task_fields
 from permissions import (
     PermissionDeniedError,
     TaskNotFoundError,
@@ -90,25 +91,14 @@ def create_tasks_blueprint(Session):
     @handle_errors
     def create_task():
         data = request.get_json(silent=True) or {}
-        title = (data.get("title") or "").strip()
-
-        if not title:
-            return jsonify({"error": "title is required"}), 400
-
-        status_val = data.get("status", TaskStatus.todo.value)
-        priority_val = data.get("priority", TaskPriority.medium.value)
-
-        if status_val not in _VALID_STATUSES:
-            return jsonify({"error": f"Invalid status. Must be one of: {', '.join(sorted(_VALID_STATUSES))}"}), 400
-        if priority_val not in _VALID_PRIORITIES:
-            return jsonify({"error": f"Invalid priority. Must be one of: {', '.join(sorted(_VALID_PRIORITIES))}"}), 400
+        cleaned = validate_task_fields(data, require_title=True)
 
         task = Task(
             user_id=g.user_id,
-            title=title,
-            description=(data.get("description") or "").strip() or None,
-            status=TaskStatus(status_val),
-            priority=TaskPriority(priority_val),
+            title=cleaned["title"],
+            description=cleaned.get("description"),
+            status=TaskStatus(cleaned.get("status", TaskStatus.todo.value)),
+            priority=TaskPriority(cleaned.get("priority", TaskPriority.medium.value)),
         )
         Session.add(task)
         Session.commit()
@@ -140,25 +130,16 @@ def create_tasks_blueprint(Session):
 
         task = Session.get(Task, task_id)
         data = request.get_json(silent=True) or {}
+        cleaned = validate_task_fields(data, require_title=False)
 
-        if "title" in data:
-            title = (data["title"] or "").strip()
-            if not title:
-                return jsonify({"error": "title cannot be empty"}), 400
-            task.title = title
-
-        if "description" in data:
-            task.description = (data["description"] or "").strip() or None
-
-        if "status" in data:
-            if data["status"] not in _VALID_STATUSES:
-                return jsonify({"error": f"Invalid status. Must be one of: {', '.join(sorted(_VALID_STATUSES))}"}), 400
-            task.status = TaskStatus(data["status"])
-
-        if "priority" in data:
-            if data["priority"] not in _VALID_PRIORITIES:
-                return jsonify({"error": f"Invalid priority. Must be one of: {', '.join(sorted(_VALID_PRIORITIES))}"}), 400
-            task.priority = TaskPriority(data["priority"])
+        if "title" in cleaned:
+            task.title = cleaned["title"]
+        if "description" in cleaned:
+            task.description = cleaned["description"]
+        if "status" in cleaned:
+            task.status = TaskStatus(cleaned["status"])
+        if "priority" in cleaned:
+            task.priority = TaskPriority(cleaned["priority"])
 
         task.updated_at = datetime.now(timezone.utc)
         Session.commit()

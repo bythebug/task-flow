@@ -4,6 +4,7 @@ import logging
 from flask import g, jsonify, request
 
 from auth import TokenError, decode_token
+from error_handlers import AppError
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,8 @@ def handle_errors(f):
     def decorated(*args, **kwargs):
         try:
             return f(*args, **kwargs)
+        except AppError:
+            raise  # propagate to Flask error handlers
         except Exception:
             logger.exception("Unhandled exception in %s", f.__name__)
             return jsonify({"error": "Internal server error"}), 500

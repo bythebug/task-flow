@@ -5,18 +5,19 @@ import jwt
 from sqlalchemy.orm import Session
 
 from config import JWT_ALGORITHM, JWT_SECRET_KEY, TOKEN_EXPIRY_HOURS
+from error_handlers import AppError
 from models import User
 
 
-class EmailAlreadyExistsError(Exception):
+class EmailAlreadyExistsError(AppError):
     pass
 
 
-class AuthenticationError(Exception):
+class AuthenticationError(AppError):
     pass
 
 
-class TokenError(Exception):
+class TokenError(AppError):
     pass
 
 

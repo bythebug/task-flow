@@ -1,3 +1,4 @@
+from error_handlers import AppError
 from models import PermissionLevel, Task, TaskPermission, User
 
 _LEVEL_RANK = {
@@ -7,15 +8,15 @@ _LEVEL_RANK = {
 }
 
 
-class PermissionDeniedError(Exception):
+class PermissionDeniedError(AppError):
     pass
 
 
-class UserNotFoundError(Exception):
+class UserNotFoundError(AppError):
     pass
 
 
-class TaskNotFoundError(Exception):
+class TaskNotFoundError(AppError):
     pass
 
 

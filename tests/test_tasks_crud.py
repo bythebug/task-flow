@@ -21,7 +21,7 @@ def clear_blocklist():
 
 # --- helpers ---
 
-def _register_and_login(client, email, password="password123"):
+def _register_and_login(client, email, password="Password123"):
     client.post("/auth/register", json={"email": email, "password": password})
     res = client.post("/auth/login", json={"email": email, "password": password})
     return res.get_json()["token"]
