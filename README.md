@@ -60,19 +60,17 @@ task-flow/
 
 ## Live Demo
 
-**Base URL:** `https://task-flow-production-ac25.up.railway.app`
+**URL:** https://task-flow-production-ac25.up.railway.app
 
-```bash
-# Health check
-curl https://task-flow-production-ac25.up.railway.app/health
-
-# Register and get a token
-curl -X POST https://task-flow-production-ac25.up.railway.app/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com","password":"Password123"}'
+**Test account** — no sign-up needed:
+```
+Email:    demo@taskflow.dev
+Password: Demo1234
 ```
 
-Import [`postman_collection.json`](postman_collection.json) into Postman for a one-click interactive tour of all endpoints — the collection auto-saves your token after login.
+The demo account has 5 pre-loaded tasks across different statuses and priorities so you can explore the UI immediately.
+
+Import [`postman_collection.json`](postman_collection.json) into Postman to test all API endpoints — the collection auto-saves your token after login.
 
 ---
 
