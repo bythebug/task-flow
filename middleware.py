@@ -44,3 +44,20 @@ def handle_errors(f):
             return jsonify({"error": "Internal server error"}), 500
 
     return decorated
+
+
+def check_task_access(session, task_id: int, user_id: int, required_level):
+    """Return an error response tuple if access is denied, None if granted.
+
+    Call this at the top of any view that operates on a specific task.
+    required_level should be a PermissionLevel enum value.
+    """
+    from models import Task
+    from permissions import check_permission
+
+    task = session.get(Task, task_id)
+    if task is None:
+        return jsonify({"error": "Task not found"}), 404
+    if not check_permission(session, task_id, user_id, required_level):
+        return jsonify({"error": "Access denied"}), 403
+    return None

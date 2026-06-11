@@ -3,13 +3,24 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, g, jsonify, request
 
-from middleware import handle_errors, require_auth
-from models import Task, TaskPriority, TaskStatus
+from middleware import check_task_access, handle_errors, require_auth
+from models import PermissionLevel, Task, TaskPriority, TaskStatus
+from permissions import (
+    PermissionDeniedError,
+    TaskNotFoundError,
+    UserNotFoundError,
+    check_permission,
+    get_task_collaborators,
+    revoke_access,
+    share_task,
+    update_permission,
+)
 
 logger = logging.getLogger(__name__)
 
 _VALID_STATUSES = {s.value for s in TaskStatus}
 _VALID_PRIORITIES = {p.value for p in TaskPriority}
+_VALID_PERMISSION_LEVELS = {p.value for p in PermissionLevel}
 
 
 def _task_to_dict(task: Task) -> dict:
@@ -23,16 +34,6 @@ def _task_to_dict(task: Task) -> dict:
         "created_at": task.created_at.isoformat(),
         "updated_at": task.updated_at.isoformat(),
     }
-
-
-def _get_owned_task(Session, task_id: int, user_id: int):
-    """Return (task, error_response) — one of the two is always None."""
-    task = Session.get(Task, task_id)
-    if task is None:
-        return None, (jsonify({"error": "Task not found"}), 404)
-    if task.user_id != user_id:
-        return None, (jsonify({"error": "Access denied"}), 403)
-    return task, None
 
 
 def create_tasks_blueprint(Session):
@@ -117,28 +118,27 @@ def create_tasks_blueprint(Session):
         return jsonify(_task_to_dict(task)), 201
 
     # ------------------------------------------------------------------ #
-    # GET /tasks/<id>
+    # GET /tasks/<id>  — requires view permission
     # ------------------------------------------------------------------ #
     @tasks_bp.route("/<int:task_id>", methods=["GET"])
     @require_auth
     @handle_errors
     def get_task(task_id: int):
-        task, err = _get_owned_task(Session, task_id, g.user_id)
-        if err:
+        if err := check_task_access(Session, task_id, g.user_id, PermissionLevel.view):
             return err
-        return jsonify(_task_to_dict(task)), 200
+        return jsonify(_task_to_dict(Session.get(Task, task_id))), 200
 
     # ------------------------------------------------------------------ #
-    # PUT /tasks/<id>
+    # PUT /tasks/<id>  — requires edit permission
     # ------------------------------------------------------------------ #
     @tasks_bp.route("/<int:task_id>", methods=["PUT"])
     @require_auth
     @handle_errors
     def update_task(task_id: int):
-        task, err = _get_owned_task(Session, task_id, g.user_id)
-        if err:
+        if err := check_task_access(Session, task_id, g.user_id, PermissionLevel.edit):
             return err
 
+        task = Session.get(Task, task_id)
         data = request.get_json(silent=True) or {}
 
         if "title" in data:
@@ -168,20 +168,104 @@ def create_tasks_blueprint(Session):
         return jsonify(_task_to_dict(task)), 200
 
     # ------------------------------------------------------------------ #
-    # DELETE /tasks/<id>
+    # DELETE /tasks/<id>  — requires delete permission
     # ------------------------------------------------------------------ #
     @tasks_bp.route("/<int:task_id>", methods=["DELETE"])
     @require_auth
     @handle_errors
     def delete_task(task_id: int):
-        task, err = _get_owned_task(Session, task_id, g.user_id)
-        if err:
+        if err := check_task_access(Session, task_id, g.user_id, PermissionLevel.delete):
             return err
 
+        task = Session.get(Task, task_id)
         Session.delete(task)
         Session.commit()
 
         logger.info("task deleted id=%s user_id=%s", task_id, g.user_id)
         return jsonify({"message": "Task deleted"}), 200
+
+    # ------------------------------------------------------------------ #
+    # POST /tasks/<id>/share
+    # ------------------------------------------------------------------ #
+    @tasks_bp.route("/<int:task_id>/share", methods=["POST"])
+    @require_auth
+    @handle_errors
+    def share_task_endpoint(task_id: int):
+        data = request.get_json(silent=True) or {}
+        email = (data.get("email") or "").strip()
+        permission_level = data.get("permission_level", PermissionLevel.view.value)
+
+        if not email:
+            return jsonify({"error": "email is required"}), 400
+        if permission_level not in _VALID_PERMISSION_LEVELS:
+            return jsonify({"error": f"Invalid permission_level. Must be one of: {', '.join(sorted(_VALID_PERMISSION_LEVELS))}"}), 400
+
+        try:
+            target = share_task(Session, task_id, g.user_id, email, permission_level)
+        except TaskNotFoundError:
+            return jsonify({"error": "Task not found"}), 404
+        except UserNotFoundError:
+            return jsonify({"error": f"No user with email {email}"}), 404
+        except PermissionDeniedError as e:
+            return jsonify({"error": str(e)}), 403
+
+        logger.info("task shared task_id=%s with user_id=%s level=%s", task_id, target.id, permission_level)
+        return jsonify({"message": f"Task shared with {email}", "user_id": target.id, "permission_level": permission_level}), 200
+
+    # ------------------------------------------------------------------ #
+    # GET /tasks/<id>/collaborators
+    # ------------------------------------------------------------------ #
+    @tasks_bp.route("/<int:task_id>/collaborators", methods=["GET"])
+    @require_auth
+    @handle_errors
+    def list_collaborators(task_id: int):
+        try:
+            collaborators = get_task_collaborators(Session, task_id, g.user_id)
+        except TaskNotFoundError:
+            return jsonify({"error": "Task not found"}), 404
+        except PermissionDeniedError:
+            return jsonify({"error": "Access denied"}), 403
+
+        return jsonify({"collaborators": collaborators}), 200
+
+    # ------------------------------------------------------------------ #
+    # DELETE /tasks/<id>/share/<user_id>
+    # ------------------------------------------------------------------ #
+    @tasks_bp.route("/<int:task_id>/share/<int:target_user_id>", methods=["DELETE"])
+    @require_auth
+    @handle_errors
+    def revoke_access_endpoint(task_id: int, target_user_id: int):
+        try:
+            revoke_access(Session, task_id, g.user_id, target_user_id)
+        except TaskNotFoundError:
+            return jsonify({"error": "Task not found"}), 404
+        except PermissionDeniedError as e:
+            return jsonify({"error": str(e)}), 403
+
+        logger.info("access revoked task_id=%s target_user_id=%s by user_id=%s", task_id, target_user_id, g.user_id)
+        return jsonify({"message": "Access revoked"}), 200
+
+    # ------------------------------------------------------------------ #
+    # PUT /tasks/<id>/permissions/<user_id>
+    # ------------------------------------------------------------------ #
+    @tasks_bp.route("/<int:task_id>/permissions/<int:target_user_id>", methods=["PUT"])
+    @require_auth
+    @handle_errors
+    def update_permission_endpoint(task_id: int, target_user_id: int):
+        data = request.get_json(silent=True) or {}
+        permission_level = data.get("permission_level", "")
+
+        if permission_level not in _VALID_PERMISSION_LEVELS:
+            return jsonify({"error": f"Invalid permission_level. Must be one of: {', '.join(sorted(_VALID_PERMISSION_LEVELS))}"}), 400
+
+        try:
+            update_permission(Session, task_id, g.user_id, target_user_id, permission_level)
+        except TaskNotFoundError:
+            return jsonify({"error": "Task not found"}), 404
+        except PermissionDeniedError as e:
+            return jsonify({"error": str(e)}), 403
+
+        logger.info("permission updated task_id=%s target_user_id=%s level=%s", task_id, target_user_id, permission_level)
+        return jsonify({"message": "Permission updated", "permission_level": permission_level}), 200
 
     return tasks_bp
