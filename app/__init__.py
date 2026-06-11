@@ -31,6 +31,20 @@ def create_app(database_url: str | None = None) -> Flask:
     def shutdown_session(exception: BaseException | None = None) -> None:
         Session.remove()
 
+    @app.route("/")
+    def index():
+        return {
+            "name": "task-flow API",
+            "version": "1.0",
+            "status": "running",
+            "docs": "https://github.com/bythebug/task-flow",
+            "endpoints": {
+                "auth":   ["/auth/register", "/auth/login", "/auth/logout"],
+                "tasks":  ["/tasks/", "/tasks/<id>"],
+                "sharing": ["/tasks/<id>/share", "/tasks/<id>/collaborators"],
+            },
+        }, 200
+
     @app.route("/health")
     def health():
         return {"status": "ok"}, 200
