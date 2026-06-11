@@ -1,5 +1,6 @@
 from error_handlers import AppError
 from models import PermissionLevel, Task, TaskPermission, User
+from sqlalchemy.orm import joinedload
 
 _LEVEL_RANK = {
     PermissionLevel.view: 1,
@@ -105,12 +106,18 @@ def get_task_collaborators(session, task_id: int, requester_id: int) -> list[dic
     if not check_permission(session, task_id, requester_id, PermissionLevel.view):
         raise PermissionDeniedError("Access denied")
 
-    result = []
-    for perm in session.query(TaskPermission).filter_by(task_id=task_id).all():
-        user = session.get(User, perm.user_id)
-        result.append({
-            "user_id": user.id,
-            "email": user.email,
+    # joinedload fetches TaskPermission + User in one query, avoiding N+1
+    perms = (
+        session.query(TaskPermission)
+        .options(joinedload(TaskPermission.user))
+        .filter_by(task_id=task_id)
+        .all()
+    )
+    return [
+        {
+            "user_id": perm.user.id,
+            "email": perm.user.email,
             "permission_level": perm.permission_level.value,
-        })
-    return result
+        }
+        for perm in perms
+    ]

@@ -2,12 +2,11 @@ import logging
 import os
 
 from flask import Blueprint, Flask, g, jsonify, request
-from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from auth import login, register
 from config import TOKEN_EXPIRY_HOURS
+from database import create_engine_with_pool
 from error_handlers import ValidationError, register_error_handlers
 from middleware import _token_blocklist, handle_errors, require_auth
 from models import Base
@@ -25,18 +24,7 @@ def create_app(database_url: str | None = None) -> Flask:
     app = Flask(__name__)
 
     db_url = database_url or os.getenv("DATABASE_URL", "sqlite:///taskflow.db")
-
-    # StaticPool keeps a single in-memory SQLite connection alive across
-    # all requests — required so test fixtures and request handlers share
-    # the same database rather than each getting an empty one.
-    if db_url == "sqlite:///:memory:":
-        engine = create_engine(
-            db_url,
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
-        )
-    else:
-        engine = create_engine(db_url)
+    engine = create_engine_with_pool(db_url)
 
     Base.metadata.create_all(engine)
     Session = scoped_session(sessionmaker(bind=engine))

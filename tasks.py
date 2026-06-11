@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, g, jsonify, request
 
+from cache import cache_user_tasks, get_cached_tasks, invalidate_user_cache
+from database import timed_query
 from middleware import check_task_access, handle_errors, require_auth
 from models import PermissionLevel, Task, TaskPriority, TaskStatus
 from validators import validate_task_fields
@@ -61,19 +63,46 @@ def create_tasks_blueprint(Session):
         if priority_filter and priority_filter not in _VALID_PRIORITIES:
             return jsonify({"error": f"Invalid priority. Must be one of: {', '.join(sorted(_VALID_PRIORITIES))}"}), 400
 
-        query = Session.query(Task).filter(Task.user_id == g.user_id)
-        if status_filter:
-            query = query.filter(Task.status == TaskStatus(status_filter))
-        if priority_filter:
-            query = query.filter(Task.priority == TaskPriority(priority_filter))
+        use_cache = not status_filter and not priority_filter
 
-        total = query.count()
-        tasks = (
-            query.order_by(Task.created_at.desc())
-            .offset((page - 1) * limit)
-            .limit(limit)
-            .all()
-        )
+        if use_cache:
+            all_tasks = get_cached_tasks(g.user_id)
+            if all_tasks is None:
+                with timed_query("list_tasks_db"):
+                    all_tasks = [
+                        _task_to_dict(t)
+                        for t in Session.query(Task)
+                        .filter(Task.user_id == g.user_id)
+                        .order_by(Task.created_at.desc())
+                        .all()
+                    ]
+                cache_user_tasks(g.user_id, all_tasks)
+
+            total = len(all_tasks)
+            tasks_page = all_tasks[(page - 1) * limit : page * limit]
+            return jsonify({
+                "tasks": tasks_page,
+                "total": total,
+                "page": page,
+                "limit": limit,
+                "pages": max(1, (total + limit - 1) // limit),
+            }), 200
+
+        # Filtered path — skip cache, let the DB do the work
+        with timed_query("list_tasks_filtered"):
+            query = Session.query(Task).filter(Task.user_id == g.user_id)
+            if status_filter:
+                query = query.filter(Task.status == TaskStatus(status_filter))
+            if priority_filter:
+                query = query.filter(Task.priority == TaskPriority(priority_filter))
+
+            total = query.count()
+            tasks = (
+                query.order_by(Task.created_at.desc())
+                .offset((page - 1) * limit)
+                .limit(limit)
+                .all()
+            )
 
         return jsonify({
             "tasks": [_task_to_dict(t) for t in tasks],
@@ -104,6 +133,7 @@ def create_tasks_blueprint(Session):
         Session.commit()
         Session.refresh(task)
 
+        invalidate_user_cache(g.user_id)
         logger.info("task created id=%s user_id=%s", task.id, g.user_id)
         return jsonify(_task_to_dict(task)), 201
 
@@ -145,6 +175,7 @@ def create_tasks_blueprint(Session):
         Session.commit()
         Session.refresh(task)
 
+        invalidate_user_cache(task.user_id)
         logger.info("task updated id=%s user_id=%s", task.id, g.user_id)
         return jsonify(_task_to_dict(task)), 200
 
@@ -162,6 +193,7 @@ def create_tasks_blueprint(Session):
         Session.delete(task)
         Session.commit()
 
+        invalidate_user_cache(g.user_id)
         logger.info("task deleted id=%s user_id=%s", task_id, g.user_id)
         return jsonify({"message": "Task deleted"}), 200
 
