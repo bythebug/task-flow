@@ -33,6 +33,10 @@ Thumbs.db
 # Claude
 .claude/
 
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+
 # Markdown (project docs are committed; scratch files are not)
 *.md
 !README.md
