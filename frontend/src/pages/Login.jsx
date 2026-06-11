@@ -45,8 +45,8 @@ export default function Login() {
         <div className="text-center mb-8">
           <span className="text-3xl font-bold text-indigo-600">⬡ task-flow</span>
           <p className="mt-3 text-slate-600 text-sm leading-relaxed">
-            A task management API built with Flask, PostgreSQL and Redis —
-            featuring JWT auth, Redis caching, and fine-grained permission sharing.
+            A task management API built with Flask, PostgreSQL and Redis.
+            JWT auth, Redis caching, and fine-grained permission sharing.
           </p>
           <div className="flex items-center justify-center gap-4 mt-3">
             <a
@@ -75,11 +75,11 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Demo credentials hint */}
-        <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 mb-4 text-center">
+        {/* Demo credentials hint — only shown on login */}
+        {mode === 'login' && <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 mb-4 text-center">
           <p className="text-xs text-indigo-700 font-medium mb-0.5">Try the demo account</p>
           <p className="text-xs text-indigo-600 font-mono">demo@taskflow.dev · Demo1234</p>
-        </div>
+        </div>}
 
         {/* Auth card */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
