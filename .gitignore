@@ -33,6 +33,8 @@ Thumbs.db
 # Claude
 .claude/
 
-# Markdown (except README.md)
+# Markdown (project docs are committed; scratch files are not)
 *.md
 !README.md
+!API_DOCS.md
+!SETUP_GUIDE.md
