@@ -58,6 +58,24 @@ task-flow/
 
 ---
 
+## Live Demo
+
+**Base URL:** `https://task-flow-production-ac25.up.railway.app`
+
+```bash
+# Health check
+curl https://task-flow-production-ac25.up.railway.app/health
+
+# Register and get a token
+curl -X POST https://task-flow-production-ac25.up.railway.app/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","password":"Password123"}'
+```
+
+Import [`postman_collection.json`](postman_collection.json) into Postman for a one-click interactive tour of all endpoints — the collection auto-saves your token after login.
+
+---
+
 ## Quick Start (Docker)
 
 ```bash

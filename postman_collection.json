@@ -11,7 +11,7 @@
     ]
   },
   "variable": [
-    { "key": "base_url",       "value": "http://localhost:5000", "type": "string" },
+    { "key": "base_url",       "value": "https://task-flow-production-ac25.up.railway.app", "type": "string" },
     { "key": "token",          "value": "",                      "type": "string" },
     { "key": "task_id",        "value": "1",                     "type": "string" },
     { "key": "target_user_id", "value": "2",                     "type": "string" },
