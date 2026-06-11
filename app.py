@@ -11,6 +11,7 @@ from auth import AuthenticationError, EmailAlreadyExistsError, login, register
 from config import TOKEN_EXPIRY_HOURS
 from middleware import _token_blocklist, handle_errors, require_auth
 from models import Base
+from tasks import create_tasks_blueprint
 
 logging.basicConfig(
     level=logging.INFO,
@@ -105,6 +106,7 @@ def create_app(database_url: str | None = None) -> Flask:
         return jsonify({"message": "Logged out successfully"}), 200
 
     app.register_blueprint(auth_bp, url_prefix="/auth")
+    app.register_blueprint(create_tasks_blueprint(Session), url_prefix="/tasks")
 
     return app
 
